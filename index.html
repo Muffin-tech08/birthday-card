@@ -60,7 +60,7 @@ html,body{
   pointer-events:none;
 }
 
-/* ================= PHASE 1 : COVER ================= */
+/* ================= STAGE 1 : COVER ================= */
 #coverScreen{
   z-index:30;
   cursor:pointer;
@@ -86,66 +86,30 @@ html,body{
   0%,100%{ opacity:.55; transform:translateY(0); }
   50%{ opacity:1; transform:translateY(-4px); }
 }
-.app.cover-open #coverScreen .cover-face{
+#coverScreen.cover-open .cover-face{
   transform:rotateY(-110deg);
   opacity:0;
-  pointer-events:none;
 }
 
-/* ================= PHASE 2 : ENVELOPE ================= */
+/* ================= STAGE 2 : ENVELOPE ================= */
 #envelopeScreen{
   z-index:20;
   cursor:pointer;
-  transition:opacity .6s ease, visibility .6s ease;
 }
-#envelopeScreen.hidden{
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
-}
-
-/* Layer 1 : back envelope art */
-#envelopeScreen .env-back{ z-index:1; }
-
-/* Layer 2 : the letter, tucked into the pocket, anchored to the bottom */
-.letter-layer{
-  position:absolute;
-  left:0; bottom:0;
-  width:100%; height:100%;
-  z-index:2;
-  display:flex;
-  align-items:flex-end;
-  justify-content:center;
-  pointer-events:none;
-}
-.letter-layer img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  object-position:bottom center;
-  display:block;
-  transform:translateY(40%) scale(0.9);
-  transform-origin:bottom center;
-  transition:transform .65s cubic-bezier(.25,.85,.3,1.15), opacity .5s ease;
-  box-shadow:0 -10px 30px rgba(0,0,0,0.3);
-  border-radius:10px 10px 0 0;
+#envelopeScreen .env-inner{
+  position:absolute; inset:0;
+  transform:scale(1) translateY(0%);
+  transform-origin:center center;
+  transition:transform .6s cubic-bezier(.3,.7,.3,1), opacity .55s ease;
   opacity:1;
 }
-#envelopeScreen.letter-open .letter-layer img{
-  transform:translateY(-15%) scale(1);
+#envelopeScreen.envelope-zoomed .env-inner{
+  transform:scale(1.4) translateY(-10%);
 }
-#envelopeScreen.letter-leaving .letter-layer img{
-  transform:translateY(100%) scale(1);
+#envelopeScreen.envelope-leaving .env-inner{
+  transform:translateY(100%) scale(0.9);
   opacity:0;
 }
-
-/* Layer 3 : front envelope art (the pocket lip), on top, non-interactive */
-.env-front-layer{
-  position:absolute; inset:0;
-  z-index:3;
-  pointer-events:none;
-}
-
 #envelopeScreen .env-hint{
   position:absolute; left:0; right:0; bottom:5%;
   text-align:center; z-index:4;
@@ -154,9 +118,15 @@ html,body{
   pointer-events:none;
   transition:opacity .3s ease;
 }
+#envelopeScreen.envelope-zoomed .env-hint{ opacity:0; }
 
-/* ================= PHASE 3 : CAKE ================= */
-#cakeScreen{ z-index:10; }
+/* ================= STAGE 3 : CAKE ================= */
+#cakeScreen{
+  z-index:10;
+  opacity:0;
+  transition:opacity .6s ease;
+}
+#cakeScreen.cake-visible{ opacity:1; }
 
 .mic-hint{
   position:absolute; left:0; right:0; top:6%;
@@ -262,7 +232,7 @@ html,body{
 
 <div class="app" id="app">
 
-  <!-- PHASE 3 : CAKE (sits at the bottom of the stack, revealed last) -->
+  <!-- STAGE 3 : CAKE (bottom of the stack, revealed last) -->
   <div class="screen" id="cakeScreen">
     <img class="bg" src="cake.png" alt="cake" draggable="false">
     <div class="mic-hint" id="micHint">blow into the mic 🎤 (or tap the cake)</div>
@@ -277,17 +247,15 @@ html,body{
     </div>
   </div>
 
-  <!-- PHASE 2 : ENVELOPE -->
+  <!-- STAGE 2 : ENVELOPE (letter text is baked into envelope.png itself) -->
   <div class="screen" id="envelopeScreen">
-    <img class="bg env-back" src="envelope.png" alt="envelope" draggable="false">
-    <div class="letter-layer">
-      <img src="letter.png" alt="letter" draggable="false">
+    <div class="env-inner">
+      <img class="bg" src="envelope.png" alt="envelope" draggable="false">
     </div>
-    <img class="bg env-front-layer" src="envelope.png" alt="" draggable="false">
-    <div class="env-hint" id="envHint">tap to open the letter</div>
+    <div class="env-hint" id="envHint">tap to read • tap again to continue</div>
   </div>
 
-  <!-- PHASE 1 : COVER -->
+  <!-- STAGE 1 : COVER -->
   <div class="screen" id="coverScreen">
     <div class="cover-face">
       <img class="bg" src="cover.png" alt="cover" draggable="false">
@@ -302,41 +270,55 @@ html,body{
 (function(){
   "use strict";
 
-  var app = document.getElementById('app');
   var coverScreen = document.getElementById('coverScreen');
   var envelopeScreen = document.getElementById('envelopeScreen');
   var envHint = document.getElementById('envHint');
   var cakeScreen = document.getElementById('cakeScreen');
 
-  /* ---------------- PHASE 1 → 2 : open the cover ---------------- */
+  /* ---------------- STAGE 1 : the 3D book cover hinge ---------------- */
   var coverOpened = false;
   coverScreen.addEventListener('click', function(){
     if(coverOpened) return;
     coverOpened = true;
-    app.classList.add('cover-open');
+    coverScreen.classList.add('cover-open');
+    // once the swing-open + fade transition finishes, remove it from the
+    // layout entirely so it can never block touches on the layers beneath
+    setTimeout(function(){
+      coverScreen.style.display = 'none';
+    }, 1000);
   });
 
-  /* ---------------- PHASE 2 : envelope / letter ---------------- */
-  var letterState = 'closed'; // closed -> open -> leaving
+  /* ---------------- STAGE 2 : envelope click-tracking state machine ---------------- */
+  let clickCount = 0;
+
   envelopeScreen.addEventListener('click', function(){
     if(!coverOpened) return;
-    if(letterState === 'closed'){
-      letterState = 'open';
-      envelopeScreen.classList.add('letter-open');
+
+    clickCount++;
+
+    if(clickCount === 1){
+      // CLICK 1: zoom & read
+      envelopeScreen.classList.add('envelope-zoomed');
       envHint.style.opacity = '0';
-    } else if(letterState === 'open'){
-      letterState = 'leaving';
-      envelopeScreen.classList.remove('letter-open');
-      envelopeScreen.classList.add('letter-leaving');
-      // fade the whole envelope scene away shortly after the letter starts sliding down
+    } else if(clickCount === 2){
+      // CLICK 2: clear out & reveal cake
+      envelopeScreen.classList.remove('envelope-zoomed');
+      envelopeScreen.classList.add('envelope-leaving');
+
       setTimeout(function(){
-        envelopeScreen.classList.add('hidden');
+        // CRUCIAL FIX: physically remove the envelope layer so it can
+        // never block or hide the cake page underneath it
+        envelopeScreen.style.display = 'none';
+
+        // reveal the cake at the exact same moment
+        cakeScreen.classList.add('cake-visible');
         startMic();
-      }, 380);
+      }, 600);
     }
+    // any click after the 2nd is ignored — the envelope is already gone
   });
 
-  /* ---------------- PHASE 3 : candles / mic blow detection ---------------- */
+  /* ---------------- STAGE 3 : candles / mic blow detection ---------------- */
   var flameEls = Array.prototype.slice.call(document.querySelectorAll('.flame'));
   var banner = document.getElementById('banner');
   var micHint = document.getElementById('micHint');
@@ -369,7 +351,7 @@ html,body{
       confetti({ particleCount: 6, angle: 120, spread: 65, origin: { x: 1, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
       if (Date.now() < end) requestAnimationFrame(frame);
     })();
-    confetti({ particleCount: 120, spread: 110, origin: { y: 0.5 }, startVelocity: 42, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c','#a3d8f4'] });
+    confetti({ particleCount: 140, spread: 120, origin: { y: 0.5 }, startVelocity: 45, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c','#a3d8f4'] });
     setTimeout(function(){ banner.classList.add('show'); }, 250);
   }
 
