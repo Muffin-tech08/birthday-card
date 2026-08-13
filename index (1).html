@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Happy Birthday</title>
+<style>
+
+/* =====================================================================
+   🕯️  FLAMES TUNING PANEL
+   Adjust these four numbers to pixel-align the 3 flames over the wicks
+   drawn on cake.png. Nothing else in the file needs to change.
+   ===================================================================== */
+:root{
+  --flame-bottom: 20%;   /* distance of the flame cluster from the bottom edge of the screen */
+  --flame-gap:    45px;  /* horizontal spacing between each of the 3 flames */
+  --flame-width:  22px;  /* width of a single flame */
+  --flame-height: 40px;  /* height of a single flame */
+}
+/* ===================================================================== */
+
+*{ box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+html,body{
+  margin:0; padding:0;
+  width:100%; height:100%;
+  overflow:hidden;
+  overscroll-behavior:none;
+  touch-action:none;
+  position:fixed;
+  inset:0;
+  background:#cbb293;
+  font-family:'Georgia','Times New Roman',serif;
+}
+
+.app{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100dvh;
+  background:#cbb293;
+  overflow:hidden;
+}
+
+/* ---------- shared full-screen layer rules ---------- */
+.screen{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+}
+.screen img.bg{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+  display:block;
+  pointer-events:none;
+}
+
+/* ================= PHASE 1 : COVER ================= */
+#coverScreen{
+  z-index:30;
+  cursor:pointer;
+  perspective:1200px;
+}
+#coverScreen .cover-face{
+  position:absolute; inset:0;
+  transform-origin:left center;
+  transform-style:preserve-3d;
+  transform:rotateY(0deg);
+  transition:transform 1s cubic-bezier(.6,.02,.2,1), opacity .5s ease .5s;
+  box-shadow:6px 0 30px rgba(0,0,0,0.35);
+}
+#coverScreen .tap-hint{
+  position:absolute; left:0; right:0; bottom:6%;
+  text-align:center;
+  color:#fff; font-weight:bold; letter-spacing:1.5px; font-size:14px;
+  text-shadow:0 2px 6px rgba(0,0,0,0.6);
+  animation:pulse 1.8s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes pulse{
+  0%,100%{ opacity:.55; transform:translateY(0); }
+  50%{ opacity:1; transform:translateY(-4px); }
+}
+.app.cover-open #coverScreen .cover-face{
+  transform:rotateY(-110deg);
+  opacity:0;
+  pointer-events:none;
+}
+
+/* ================= PHASE 2 : ENVELOPE ================= */
+#envelopeScreen{
+  z-index:20;
+  cursor:pointer;
+  transition:opacity .6s ease, visibility .6s ease;
+}
+#envelopeScreen.hidden{
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+}
+
+/* Layer 1 : back envelope art */
+#envelopeScreen .env-back{ z-index:1; }
+
+/* Layer 2 : the letter, tucked into the pocket, anchored to the bottom */
+.letter-layer{
+  position:absolute;
+  left:0; bottom:0;
+  width:100%; height:100%;
+  z-index:2;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  pointer-events:none;
+}
+.letter-layer img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:bottom center;
+  display:block;
+  transform:translateY(40%) scale(0.9);
+  transform-origin:bottom center;
+  transition:transform .65s cubic-bezier(.25,.85,.3,1.15), opacity .5s ease;
+  box-shadow:0 -10px 30px rgba(0,0,0,0.3);
+  border-radius:10px 10px 0 0;
+  opacity:1;
+}
+#envelopeScreen.letter-open .letter-layer img{
+  transform:translateY(-15%) scale(1);
+}
+#envelopeScreen.letter-leaving .letter-layer img{
+  transform:translateY(100%) scale(1);
+  opacity:0;
+}
+
+/* Layer 3 : front envelope art (the pocket lip), on top, non-interactive */
+.env-front-layer{
+  position:absolute; inset:0;
+  z-index:3;
+  pointer-events:none;
+}
+
+#envelopeScreen .env-hint{
+  position:absolute; left:0; right:0; bottom:5%;
+  text-align:center; z-index:4;
+  color:#fff; font-weight:bold; font-size:13px; letter-spacing:1px;
+  text-shadow:0 2px 5px rgba(0,0,0,0.55);
+  pointer-events:none;
+  transition:opacity .3s ease;
+}
+
+/* ================= PHASE 3 : CAKE ================= */
+#cakeScreen{ z-index:10; }
+
+.mic-hint{
+  position:absolute; left:0; right:0; top:6%;
+  text-align:center; z-index:6;
+  color:#5b3a22; font-weight:bold; font-size:13px; letter-spacing:.5px;
+  text-shadow:0 1px 3px rgba(255,255,255,0.5);
+  transition:opacity .4s ease;
+}
+
+.flames{
+  position:absolute;
+  left:50%; bottom:var(--flame-bottom);
+  transform:translateX(-50%);
+  display:flex;
+  align-items:flex-end;
+  gap:var(--flame-gap);
+  z-index:5;
+}
+.flame{
+  width:var(--flame-width);
+  height:var(--flame-height);
+  position:relative;
+  cursor:pointer;
+}
+.flame::before{
+  content:"";
+  position:absolute; left:0; bottom:0;
+  width:100%; height:100%;
+  border-radius:50% 50% 50% 50% / 65% 65% 35% 35%;
+  background:radial-gradient(circle at 50% 78%, #fffbe6 0%, #ffe27a 26%, #ffb238 52%, #ff7a1a 76%, rgba(255,122,26,0) 82%);
+  filter:blur(0.5px) saturate(1.15);
+  box-shadow:
+    0 0 10px 3px rgba(255,180,70,0.85),
+    0 0 22px 10px rgba(255,130,40,0.45),
+    0 0 36px 16px rgba(255,100,20,0.2);
+  transform-origin:50% 100%;
+  animation:flicker 1.4s ease-in-out infinite;
+}
+.flame:nth-child(1)::before{ animation-delay:0s; }
+.flame:nth-child(2)::before{ animation-delay:.2s; }
+.flame:nth-child(3)::before{ animation-delay:.35s; }
+
+@keyframes flicker{
+  0%{   transform:scale(1,1)      rotate(0deg); }
+  20%{  transform:scale(0.9,1.1)  rotate(-4deg); }
+  40%{  transform:scale(1.08,0.92) rotate(3deg); }
+  60%{  transform:scale(0.94,1.06) rotate(-3deg); }
+  80%{  transform:scale(1.05,0.95) rotate(4deg); }
+  100%{ transform:scale(1,1)      rotate(0deg); }
+}
+
+.flame.out::before{
+  animation:none;
+  opacity:0;
+  transform:scale(0.3,0.1);
+  transition:opacity .35s ease, transform .35s ease;
+}
+.smoke{
+  position:absolute; left:50%; top:0;
+  width:6px; height:6px; border-radius:50%;
+  background:radial-gradient(circle, rgba(160,160,160,0.65), rgba(160,160,160,0) 70%);
+  opacity:0;
+  pointer-events:none;
+}
+.flame.out .smoke{
+  animation:smokeRise 1.1s ease-out forwards;
+}
+@keyframes smokeRise{
+  0%{ opacity:.55; transform:translate(-50%,0) scale(1); }
+  100%{ opacity:0; transform:translate(-50%,-42px) scale(3.4); }
+}
+
+.banner{
+  position:absolute; left:50%; top:14%;
+  transform:translate(-50%,-14px) scale(0.7) rotate(-3deg);
+  opacity:0;
+  z-index:8;
+  background:#fff6e2;
+  padding:12px 20px;
+  border-radius:6px;
+  box-shadow:0 14px 30px rgba(0,0,0,0.4);
+  font-weight:900;
+  letter-spacing:1px;
+  font-size:22px;
+  color:#c23b4e;
+  text-align:center;
+  border:2px dashed #e7a6b0;
+  pointer-events:none;
+  transition:opacity .5s ease, transform .5s cubic-bezier(.2,1.4,.4,1);
+  max-width:82%;
+}
+.banner.show{
+  opacity:1;
+  transform:translate(-50%,0) scale(1) rotate(-2deg);
+}
+.banner span{ display:inline-block; transform:rotate(1deg); }
+.banner span:nth-child(2n){ transform:rotate(-2deg); }
+.banner span:nth-child(3n){ transform:rotate(2.5deg); }
+
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- PHASE 3 : CAKE (sits at the bottom of the stack, revealed last) -->
+  <div class="screen" id="cakeScreen">
+    <img class="bg" src="cake.png" alt="cake" draggable="false">
+    <div class="mic-hint" id="micHint">blow into the mic 🎤 (or tap the cake)</div>
+    <div class="flames" id="flames">
+      <div class="flame" data-i="1"><span class="smoke"></span></div>
+      <div class="flame" data-i="2"><span class="smoke"></span></div>
+      <div class="flame" data-i="3"><span class="smoke"></span></div>
+    </div>
+    <div class="banner" id="banner">
+      <span>H</span><span>A</span><span>P</span><span>P</span><span>Y</span>&nbsp;
+      <span>B</span><span>I</span><span>R</span><span>T</span><span>H</span><span>D</span><span>A</span><span>Y</span>&nbsp;🎉
+    </div>
+  </div>
+
+  <!-- PHASE 2 : ENVELOPE -->
+  <div class="screen" id="envelopeScreen">
+    <img class="bg env-back" src="envelope.png" alt="envelope" draggable="false">
+    <div class="letter-layer">
+      <img src="letter.png" alt="letter" draggable="false">
+    </div>
+    <img class="bg env-front-layer" src="envelope.png" alt="" draggable="false">
+    <div class="env-hint" id="envHint">tap to open the letter</div>
+  </div>
+
+  <!-- PHASE 1 : COVER -->
+  <div class="screen" id="coverScreen">
+    <div class="cover-face">
+      <img class="bg" src="cover.png" alt="cover" draggable="false">
+      <div class="tap-hint">tap to open</div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.3/confetti.browser.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var app = document.getElementById('app');
+  var coverScreen = document.getElementById('coverScreen');
+  var envelopeScreen = document.getElementById('envelopeScreen');
+  var envHint = document.getElementById('envHint');
+  var cakeScreen = document.getElementById('cakeScreen');
+
+  /* ---------------- PHASE 1 → 2 : open the cover ---------------- */
+  var coverOpened = false;
+  coverScreen.addEventListener('click', function(){
+    if(coverOpened) return;
+    coverOpened = true;
+    app.classList.add('cover-open');
+  });
+
+  /* ---------------- PHASE 2 : envelope / letter ---------------- */
+  var letterState = 'closed'; // closed -> open -> leaving
+  envelopeScreen.addEventListener('click', function(){
+    if(!coverOpened) return;
+    if(letterState === 'closed'){
+      letterState = 'open';
+      envelopeScreen.classList.add('letter-open');
+      envHint.style.opacity = '0';
+    } else if(letterState === 'open'){
+      letterState = 'leaving';
+      envelopeScreen.classList.remove('letter-open');
+      envelopeScreen.classList.add('letter-leaving');
+      // fade the whole envelope scene away shortly after the letter starts sliding down
+      setTimeout(function(){
+        envelopeScreen.classList.add('hidden');
+        startMic();
+      }, 380);
+    }
+  });
+
+  /* ---------------- PHASE 3 : candles / mic blow detection ---------------- */
+  var flameEls = Array.prototype.slice.call(document.querySelectorAll('.flame'));
+  var banner = document.getElementById('banner');
+  var micHint = document.getElementById('micHint');
+  var micReady = false;
+  var micFailed = false;
+  var micStarted = false;
+  var celebrated = false;
+  var audioCtx, analyser, dataArray, rafId;
+
+  function litFlames(){
+    return flameEls.filter(function(f){ return !f.classList.contains('out'); });
+  }
+
+  function extinguishOne(){
+    var remaining = litFlames();
+    if(!remaining.length) return false;
+    remaining[0].classList.add('out');
+    if(!litFlames().length) celebrate();
+    return true;
+  }
+
+  function celebrate(){
+    if(celebrated) return;
+    celebrated = true;
+    micHint.style.opacity = '0';
+    stopMic();
+    var end = Date.now() + 1800;
+    (function frame(){
+      confetti({ particleCount: 6, angle: 60, spread: 65, origin: { x: 0, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
+      confetti({ particleCount: 6, angle: 120, spread: 65, origin: { x: 1, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
+    confetti({ particleCount: 120, spread: 110, origin: { y: 0.5 }, startVelocity: 42, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c','#a3d8f4'] });
+    setTimeout(function(){ banner.classList.add('show'); }, 250);
+  }
+
+  // tap fallback
+  flameEls.forEach(function(f){
+    f.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(!f.classList.contains('out')){
+        f.classList.add('out');
+        if(!litFlames().length) celebrate();
+      }
+    });
+  });
+  cakeScreen.addEventListener('click', function(){
+    if(!micReady) extinguishOne();
+  });
+
+  function stopMic(){
+    if(rafId) cancelAnimationFrame(rafId);
+    if(audioCtx && audioCtx.state !== 'closed'){
+      try{ audioCtx.close(); }catch(err){}
+    }
+  }
+
+  function startMic(){
+    if(micStarted || celebrated) return;
+    micStarted = true;
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      micFailed = true;
+      micHint.textContent = 'tap the cake to blow out the candles';
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio:true })
+      .then(function(stream){
+        micReady = true;
+        micHint.textContent = 'blow into the mic 🎤';
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.6;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        source.connect(analyser);
+
+        var blowStreak = 0;
+        var lastExtinguish = 0;
+
+        (function poll(){
+          if(celebrated) return;
+          analyser.getByteFrequencyData(dataArray);
+          var sum = 0;
+          for(var i=0;i<dataArray.length;i++) sum += dataArray[i];
+          var avg = sum / dataArray.length;
+
+          if(avg > 34){ blowStreak++; } else { blowStreak = 0; }
+
+          var now = Date.now();
+          if(blowStreak > 4 && now - lastExtinguish > 260){
+            lastExtinguish = now;
+            extinguishOne();
+          }
+          rafId = requestAnimationFrame(poll);
+        })();
+      })
+      .catch(function(){
+        micFailed = true;
+        micHint.textContent = 'tap the cake to blow out the candles';
+      });
+  }
+
+})();
+</script>
+</body>
+</html>
