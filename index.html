@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Happy Birthday</title>
+<style>
+
+/* =====================================================================
+   🕯️  CANDLE FLAMES CONTROL PANEL
+   Tune these to line the 5 glowing flames up with the hand‑drawn wicks.
+   Per‑candle coordinates were sampled directly from cake.png (pixel
+   analysis of the drawn flame color), so they should already sit right
+   on the wicks — the vars below let you nudge the whole cluster or
+   rescale it without touching the per‑candle numbers.
+   ===================================================================== */
+:root{
+  /* --- master cluster controls (move / resize ALL flames at once) --- */
+  --flame-nudge-x: 0px;        /* shift entire cluster left(-)/right(+) */
+  --flame-nudge-y: 0px;        /* shift entire cluster up(-)/down(+) */
+  --flame-gap-scale: 1;        /* >1 spreads candles apart, <1 pulls them together (around center) */
+  --flame-size: 15px;          /* base flame width */
+  --flame-height: 24px;        /* base flame height */
+
+  /* --- per‑candle base position, in % of the cake page, sampled from art --- */
+  --c1-left: 29.9%;  --c1-top: 45%;
+  --c2-left: 37.6%;  --c2-top: 48.5%;
+  --c3-left: 49.8%;  --c3-top: 50%;
+  --c4-left: 61.4%;  --c4-top: 48.4%;
+  --c5-left: 70.8%;  --c5-top: 45%;
+
+  /* --- craft palette --- */
+  --paper-tan: #cbb293;
+  --paper-tan-dark: #b8996f;
+  --ink: #3c2a1e;
+}
+
+*{ box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+html,body{
+  margin:0; padding:0; height:100%; width:100%;
+  overflow:hidden; overscroll-behavior:none; touch-action:none;
+  background:var(--paper-tan);
+  font-family:'Georgia', 'Times New Roman', serif;
+}
+body{
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.06), transparent 60%),
+    var(--paper-tan);
+}
+
+.stage{
+  position:fixed; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  perspective:1600px;
+}
+
+.book{
+  position:relative;
+  width:min(92vw, 380px);
+  aspect-ratio: 2 / 3;
+  border-radius:14px;
+  box-shadow:
+    0 25px 60px rgba(0,0,0,0.45),
+    0 4px 12px rgba(0,0,0,0.25);
+}
+
+/* ---------- COVER ---------- */
+.cover{
+  position:absolute; inset:0;
+  z-index:5;
+  border-radius:14px;
+  overflow:hidden;
+  cursor:pointer;
+  transform-origin:left center;
+  transform-style:preserve-3d;
+  transform:rotateY(0deg);
+  transition:transform 1.05s cubic-bezier(.55,.06,.2,.99), opacity .5s ease .55s, box-shadow .6s ease;
+  box-shadow:0 10px 30px rgba(0,0,0,0.35);
+}
+.cover img{
+  width:100%; height:100%; object-fit:cover; display:block; pointer-events:none;
+}
+.cover .hint{
+  position:absolute; left:0; right:0; bottom:18px;
+  text-align:center;
+  font-family:'Georgia',serif; font-weight:bold; letter-spacing:1.5px;
+  font-size:13px; color:#fff;
+  text-shadow:0 2px 6px rgba(0,0,0,0.55);
+  animation:pulseHint 1.8s ease-in-out infinite;
+}
+@keyframes pulseHint{
+  0%,100%{ opacity:.55; transform:translateY(0); }
+  50%{ opacity:1; transform:translateY(-3px); }
+}
+.book.open .cover{
+  transform:rotateY(-122deg);
+  opacity:0;
+  box-shadow:none;
+  pointer-events:none;
+}
+
+/* ---------- INSIDE SPREAD ---------- */
+.spread{
+  position:absolute; inset:0;
+  border-radius:14px;
+  overflow:hidden;
+  background:var(--paper-tan-dark);
+  box-shadow: inset 0 0 40px rgba(0,0,0,0.25);
+}
+.scroller{
+  width:100%; height:100%;
+  display:flex;
+  overflow-x:auto; overflow-y:hidden;
+  scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.scroller::-webkit-scrollbar{ display:none; }
+
+.page{
+  position:relative;
+  flex:0 0 100%;
+  height:100%;
+  scroll-snap-align:center;
+  overflow:hidden;
+}
+.page > img.bg{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  object-fit:cover;
+  display:block;
+  pointer-events:none;
+}
+
+/* subtle center-fold shadow so the two pages read as a bound book */
+.spread::before{
+  content:"";
+  position:absolute; top:0; bottom:0; left:50%;
+  width:26px; margin-left:-13px;
+  background:linear-gradient(to right, rgba(0,0,0,0.22), rgba(0,0,0,0) 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.22));
+  z-index:6; pointer-events:none;
+}
+
+.page-dots{
+  position:absolute; left:0; right:0; bottom:10px;
+  display:flex; justify-content:center; gap:7px;
+  z-index:7; pointer-events:none;
+}
+.page-dots span{
+  width:6px; height:6px; border-radius:50%;
+  background:rgba(255,255,255,0.55);
+  box-shadow:0 1px 2px rgba(0,0,0,0.3);
+  transition:transform .25s ease, background .25s ease;
+}
+.page-dots span.active{
+  background:#fff;
+  transform:scale(1.3);
+}
+
+/* ---------- ENVELOPE PAGE ---------- */
+.envelope-page{ cursor:pointer; }
+
+.letter{
+  position:absolute;
+  top:44%; left:50%;
+  width:58%;
+  transform:translate(-50%,-32%) scale(0.88) rotate(-1.5deg);
+  clip-path:inset(0% 0% 58% 0% round 3px);
+  border-radius:4px;
+  box-shadow:0 6px 14px rgba(0,0,0,0.28);
+  transition:
+    top .55s cubic-bezier(.22,.9,.3,1.15),
+    transform .55s cubic-bezier(.22,.9,.3,1.15),
+    clip-path .55s cubic-bezier(.22,.9,.3,1.05),
+    box-shadow .55s ease;
+  z-index:3;
+  cursor:pointer;
+}
+.letter img{
+  display:block; width:100%; height:auto; pointer-events:none;
+  border-radius:4px;
+}
+.letter.open{
+  top:50%;
+  transform:translate(-50%,-50%) scale(1.02) rotate(0deg);
+  clip-path:inset(0% 0% 0% 0% round 3px);
+  box-shadow:0 24px 45px rgba(0,0,0,0.5);
+  z-index:9;
+}
+.envelope-backdrop{
+  position:absolute; inset:0;
+  background:rgba(30,18,10,0);
+  transition:background .5s ease;
+  z-index:2; pointer-events:none;
+}
+.envelope-backdrop.open{
+  background:rgba(20,12,6,0.55);
+  pointer-events:auto;
+}
+.envelope-hint{
+  position:absolute; left:0; right:0; top:8%;
+  text-align:center; color:#fff; font-weight:bold; font-size:12px;
+  letter-spacing:1px; text-shadow:0 2px 5px rgba(0,0,0,0.5);
+  z-index:3; pointer-events:none; opacity:0.85;
+}
+
+/* ---------- CAKE PAGE ---------- */
+.cake-page{ cursor:pointer; }
+
+.mic-hint{
+  position:absolute; left:0; right:0; top:6%;
+  text-align:center; color:#5b3a22; font-weight:bold; font-size:12px;
+  letter-spacing:0.5px; text-shadow:0 1px 2px rgba(255,255,255,0.4);
+  z-index:8; pointer-events:none;
+  transition:opacity .4s ease;
+}
+
+.flames{
+  position:absolute; inset:0;
+  z-index:4;
+  pointer-events:none;
+}
+.flame{
+  position:absolute;
+  width:var(--flame-size);
+  height:var(--flame-height);
+  transform:translate(-50%,-100%);
+  transform-origin:50% 100%;
+  pointer-events:auto;
+  cursor:pointer;
+}
+.flame::before{
+  content:"";
+  position:absolute; left:50%; bottom:0;
+  width:100%; height:100%;
+  transform:translateX(-50%);
+  border-radius:50% 50% 50% 50% / 65% 65% 35% 35%;
+  background:radial-gradient(circle at 50% 75%, #fffbe6 0%, #ffe27a 28%, #ffb238 55%, #ff7a1a 78%, rgba(255,122,26,0) 82%);
+  filter:blur(0.4px) saturate(1.15);
+  box-shadow:
+    0 0 6px 2px rgba(255,180,70,0.85),
+    0 0 16px 7px rgba(255,130,40,0.45),
+    0 0 26px 12px rgba(255,100,20,0.18);
+  animation:flicker 1.4s ease-in-out infinite;
+}
+.flame:nth-of-type(1)::before{ animation-delay:0s; }
+.flame:nth-of-type(2)::before{ animation-delay:.18s; }
+.flame:nth-of-type(3)::before{ animation-delay:.34s; }
+.flame:nth-of-type(4)::before{ animation-delay:.08s; }
+.flame:nth-of-type(5)::before{ animation-delay:.27s; }
+
+@keyframes flicker{
+  0%{   transform:translateX(-50%) scale(1,1)     rotate(0deg); }
+  20%{  transform:translateX(-50%) scale(0.92,1.08) rotate(-3deg); }
+  40%{  transform:translateX(-50%) scale(1.05,0.94) rotate(2deg); }
+  60%{  transform:translateX(-50%) scale(0.95,1.05) rotate(-2deg); }
+  80%{  transform:translateX(-50%) scale(1.04,0.96) rotate(3deg); }
+  100%{ transform:translateX(-50%) scale(1,1)      rotate(0deg); }
+}
+
+.flame.out::before{
+  animation:none;
+  opacity:0;
+  transform:translateX(-50%) scale(0.3,0.1);
+  transition:opacity .35s ease, transform .35s ease;
+}
+.smoke{
+  position:absolute; left:50%; bottom:60%;
+  width:5px; height:5px; border-radius:50%;
+  background:radial-gradient(circle, rgba(160,160,160,0.65), rgba(160,160,160,0) 70%);
+  opacity:0;
+  pointer-events:none;
+}
+.flame.out .smoke{
+  animation:smokeRise 1.1s ease-out forwards;
+}
+@keyframes smokeRise{
+  0%{ opacity:.55; transform:translate(-50%,0) scale(1); }
+  100%{ opacity:0; transform:translate(-50%,-38px) scale(3.2); }
+}
+
+.banner{
+  position:absolute; left:50%; top:16%;
+  transform:translate(-50%,-14px) scale(0.7) rotate(-3deg);
+  opacity:0;
+  z-index:10;
+  background:#fff6e2;
+  padding:10px 18px;
+  border-radius:5px;
+  box-shadow:0 12px 26px rgba(0,0,0,0.35);
+  font-family:'Georgia', serif;
+  font-weight:900;
+  letter-spacing:1px;
+  font-size:19px;
+  color:#c23b4e;
+  text-align:center;
+  border:2px dashed #e7a6b0;
+  pointer-events:none;
+  transition:opacity .5s ease, transform .5s cubic-bezier(.2,1.4,.4,1);
+}
+.banner.show{
+  opacity:1;
+  transform:translate(-50%,0) scale(1) rotate(-2deg);
+}
+
+/* small torn-paper cutout letter look for banner text */
+.banner span{
+  display:inline-block;
+  transform:rotate(1deg);
+}
+.banner span:nth-child(2n){ transform:rotate(-2deg); }
+.banner span:nth-child(3n){ transform:rotate(2.5deg); }
+
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="book" id="book">
+
+    <!-- COVER -->
+    <div class="cover" id="cover">
+      <img src="cover.png" alt="cover" draggable="false">
+      <div class="hint">tap to open</div>
+    </div>
+
+    <!-- INSIDE SPREAD -->
+    <div class="spread">
+      <div class="scroller" id="scroller">
+
+        <!-- LEFT PAGE : ENVELOPE -->
+        <section class="page envelope-page" id="envelopePage">
+          <img class="bg" src="envelope.png" alt="envelope" draggable="false">
+          <div class="envelope-backdrop" id="envelopeBackdrop"></div>
+          <div class="envelope-hint">tap the letter</div>
+          <div class="letter" id="letter">
+            <img src="letter.png" alt="letter" draggable="false">
+          </div>
+        </section>
+
+        <!-- RIGHT PAGE : CAKE -->
+        <section class="page cake-page" id="cakePage">
+          <img class="bg" src="cake.png" alt="cake" draggable="false">
+          <div class="mic-hint" id="micHint">blow into the mic 🎤 (or tap the flames)</div>
+          <div class="flames" id="flames">
+            <div class="flame" data-i="1" style="left:var(--c1-left); top:var(--c1-top);"><span class="smoke"></span></div>
+            <div class="flame" data-i="2" style="left:var(--c2-left); top:var(--c2-top);"><span class="smoke"></span></div>
+            <div class="flame" data-i="3" style="left:var(--c3-left); top:var(--c3-top);"><span class="smoke"></span></div>
+            <div class="flame" data-i="4" style="left:var(--c4-left); top:var(--c4-top);"><span class="smoke"></span></div>
+            <div class="flame" data-i="5" style="left:var(--c5-left); top:var(--c5-top);"><span class="smoke"></span></div>
+          </div>
+          <div class="banner" id="banner">
+            <span>H</span><span>A</span><span>P</span><span>P</span><span>Y</span>&nbsp;
+            <span>B</span><span>I</span><span>R</span><span>T</span><span>H</span><span>D</span><span>A</span><span>Y</span>&nbsp;🎉
+          </div>
+        </section>
+
+      </div>
+      <div class="page-dots">
+        <span class="active" data-p="0"></span>
+        <span data-p="1"></span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.3/confetti.browser.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- apply master cluster nudge / scale from the
+     control panel to each per-candle position ---------------- */
+  (function tuneFlames(){
+    var root = document.documentElement;
+    var cs = getComputedStyle(root);
+    var scale = parseFloat(cs.getPropertyValue('--flame-gap-scale')) || 1;
+    var nudgeX = parseFloat(cs.getPropertyValue('--flame-nudge-x')) || 0;
+    var nudgeY = parseFloat(cs.getPropertyValue('--flame-nudge-y')) || 0;
+    document.querySelectorAll('.flame').forEach(function(f){
+      var baseLeft = parseFloat(f.style.left);
+      var baseTop  = parseFloat(f.style.top);
+      var newLeft  = 50 + (baseLeft - 50) * scale;
+      f.style.left = 'calc(' + newLeft + '% + ' + nudgeX + 'px)';
+      f.style.top  = 'calc(' + baseTop + '% + ' + nudgeY + 'px)';
+    });
+  })();
+
+  /* ---------------- open the cover ---------------- */
+  var book = document.getElementById('book');
+  var cover = document.getElementById('cover');
+  cover.addEventListener('click', function(){
+    book.classList.add('open');
+  });
+
+  /* ---------------- page dots ---------------- */
+  var scroller = document.getElementById('scroller');
+  var dots = document.querySelectorAll('.page-dots span');
+  scroller.addEventListener('scroll', function(){
+    var idx = Math.round(scroller.scrollLeft / scroller.clientWidth);
+    dots.forEach(function(d,i){ d.classList.toggle('active', i===idx); });
+  });
+
+  /* ---------------- letter tuck / pull ---------------- */
+  var letter = document.getElementById('letter');
+  var envelopeBackdrop = document.getElementById('envelopeBackdrop');
+  var envelopeHint = document.querySelector('.envelope-hint');
+
+  function toggleLetter(e){
+    if(e) e.stopPropagation();
+    var isOpen = letter.classList.toggle('open');
+    envelopeBackdrop.classList.toggle('open', isOpen);
+    envelopeHint.style.opacity = isOpen ? '0' : '0.85';
+  }
+  letter.addEventListener('click', toggleLetter);
+  envelopeBackdrop.addEventListener('click', toggleLetter);
+
+  /* ---------------- candles / mic blow detection ---------------- */
+  var cakePage = document.getElementById('cakePage');
+  var flameEls = Array.prototype.slice.call(document.querySelectorAll('.flame'));
+  var banner = document.getElementById('banner');
+  var micHint = document.getElementById('micHint');
+  var micReady = false;
+  var micFailed = false;
+  var celebrated = false;
+  var audioCtx, analyser, dataArray, rafId;
+
+  function litFlames(){
+    return flameEls.filter(function(f){ return !f.classList.contains('out'); });
+  }
+
+  function extinguishOne(){
+    var remaining = litFlames();
+    if(!remaining.length) return false;
+    // extinguish the flame closest to the center first-ish (nice visual order: outer -> inner)
+    remaining.sort(function(a,b){
+      return Math.abs(parseFloat(a.dataset.i)-3) - Math.abs(parseFloat(b.dataset.i)-3);
+    });
+    remaining[remaining.length-1].classList.add('out');
+    if(!litFlames().length) celebrate();
+    return true;
+  }
+
+  function extinguishSequential(){
+    var remaining = litFlames();
+    remaining.forEach(function(f, idx){
+      setTimeout(function(){
+        f.classList.add('out');
+        if(!litFlames().length) celebrate();
+      }, idx * 220);
+    });
+  }
+
+  function celebrate(){
+    if(celebrated) return;
+    celebrated = true;
+    micHint.style.opacity = '0';
+    stopMic();
+    var duration = 1800;
+    var end = Date.now() + duration;
+    (function frame(){
+      confetti({ particleCount: 5, angle: 60, spread: 65, origin: { x: 0, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
+      confetti({ particleCount: 5, angle: 120, spread: 65, origin: { x: 1, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
+    confetti({ particleCount: 90, spread: 100, origin: { y: 0.5 }, startVelocity: 38, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c','#a3d8f4'] });
+    setTimeout(function(){ banner.classList.add('show'); }, 250);
+  }
+
+  // tap fallback: tap a specific flame to blow it out, or tap the cake to blow out the next one
+  flameEls.forEach(function(f){
+    f.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(!f.classList.contains('out')){
+        f.classList.add('out');
+        if(!litFlames().length) celebrate();
+      }
+    });
+  });
+  cakePage.addEventListener('click', function(){
+    if(!micReady){ extinguishOne(); }
+  });
+
+  function stopMic(){
+    if(rafId) cancelAnimationFrame(rafId);
+    if(audioCtx && audioCtx.state !== 'closed'){
+      try{ audioCtx.close(); }catch(err){}
+    }
+  }
+
+  function startMic(){
+    if(micReady || micFailed || celebrated) return;
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      micFailed = true;
+      micHint.textContent = 'tap the flames to blow them out';
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio:true })
+      .then(function(stream){
+        micReady = true;
+        micHint.textContent = 'blow into the mic 🎤';
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.6;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        source.connect(analyser);
+
+        var blowStreak = 0;
+        var lastExtinguish = 0;
+
+        (function poll(){
+          if(celebrated) return;
+          analyser.getByteFrequencyData(dataArray);
+          var sum = 0;
+          for(var i=0;i<dataArray.length;i++) sum += dataArray[i];
+          var avg = sum / dataArray.length;
+
+          if(avg > 34){
+            blowStreak++;
+          } else {
+            blowStreak = 0;
+          }
+
+          var now = Date.now();
+          if(blowStreak > 4 && now - lastExtinguish > 260){
+            lastExtinguish = now;
+            var did = extinguishOne();
+            if(!did){ /* all out already */ }
+          }
+          rafId = requestAnimationFrame(poll);
+        })();
+      })
+      .catch(function(){
+        micFailed = true;
+        micHint.textContent = 'tap the flames to blow them out';
+      });
+  }
+
+  // request mic once the cake page scrolls into view
+  var observer = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){ startMic(); }
+    });
+  }, { root: scroller, threshold: 0.6 });
+  observer.observe(cakePage);
+
+})();
+</script>
+</body>
+</html>
