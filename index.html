@@ -12,10 +12,14 @@
    drawn on cake.png. Nothing else in the file needs to change.
    ===================================================================== */
 :root{
-  --flame-bottom: 20%;   /* distance of the flame cluster from the bottom edge of the screen */
-  --flame-gap:    45px;  /* horizontal spacing between each of the 3 flames */
-  --flame-width:  22px;  /* width of a single flame */
-  --flame-height: 40px;  /* height of a single flame */
+  --flame-bottom: 24%;   /* distance of the flame cluster from the bottom edge of the cake page */
+  --flame-gap:    26px;  /* horizontal spacing between each of the 3 flames */
+  --flame-width:  16px;  /* width of a single flame */
+  --flame-height: 28px;  /* height of a single flame */
+
+  --craft-tan:   #cbb293;
+  --craft-red:   #8a1f2d;
+  --craft-red-dark:#6c1622;
 }
 /* ===================================================================== */
 
@@ -28,7 +32,7 @@ html,body{
   touch-action:none;
   position:fixed;
   inset:0;
-  background:#cbb293;
+  background:var(--craft-tan);
   font-family:'Georgia','Times New Roman',serif;
 }
 
@@ -37,8 +41,20 @@ html,body{
   inset:0;
   width:100%;
   height:100dvh;
-  background:#cbb293;
+  background:var(--craft-tan);
   overflow:hidden;
+}
+
+/* little red sticker stars scattered on the craft-paper background,
+   same touch as the reference scrapbook */
+.sticker-star{
+  position:absolute;
+  width:16px; height:16px;
+  background:var(--craft-red);
+  clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+  opacity:0.9;
+  z-index:2;
+  pointer-events:none;
 }
 
 /* ---------- shared full-screen layer rules ---------- */
@@ -91,49 +107,128 @@ html,body{
   opacity:0;
 }
 
-/* ================= STAGE 2 : ENVELOPE ================= */
-#envelopeScreen{
-  z-index:20;
-  cursor:pointer;
-}
-#envelopeScreen .env-inner{
+/* ================= STAGE 2 : THE OPEN SPREAD (envelope + cake side-by-side) ================= */
+#spread{
   position:absolute; inset:0;
-  transform:scale(1) translateY(0%);
-  transform-origin:center center;
-  transition:transform .6s cubic-bezier(.3,.7,.3,1), opacity .55s ease;
-  opacity:1;
-}
-#envelopeScreen.envelope-zoomed .env-inner{
-  transform:scale(1.4) translateY(-10%);
-}
-#envelopeScreen.envelope-leaving .env-inner{
-  transform:translateY(100%) scale(0.9);
-  opacity:0;
-}
-#envelopeScreen .env-hint{
-  position:absolute; left:0; right:0; bottom:5%;
-  text-align:center; z-index:4;
-  color:#fff; font-weight:bold; font-size:13px; letter-spacing:1px;
-  text-shadow:0 2px 5px rgba(0,0,0,0.55);
-  pointer-events:none;
-  transition:opacity .3s ease;
-}
-#envelopeScreen.envelope-zoomed .env-hint{ opacity:0; }
-
-/* ================= STAGE 3 : CAKE ================= */
-#cakeScreen{
   z-index:10;
-  opacity:0;
-  transition:opacity .6s ease;
+  display:flex;
+  width:100%; height:100%;
 }
-#cakeScreen.cake-visible{ opacity:1; }
+.page{
+  position:relative;
+  flex:1 1 50%;
+  height:100%;
+  overflow:hidden;
+}
+/* soft center-fold shadow so the two halves read as a bound book */
+#spread::after{
+  content:"";
+  position:absolute; top:0; bottom:0; left:50%;
+  width:22px; margin-left:-11px;
+  background:linear-gradient(to right, rgba(0,0,0,0.22), rgba(0,0,0,0) 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.22));
+  z-index:9; pointer-events:none;
+}
+
+/* ---------------- LEFT PAGE : ENVELOPE + FLAP + LETTER ---------------- */
+.envelope-page{
+  cursor:pointer;
+  perspective:900px;
+}
+
+/* the letter text lives on envelope.png itself; the flap below is a
+   pure-CSS pocket lid that folds open/closed on top of it */
+.flap-wrap{
+  position:absolute;
+  left:8%; right:8%;
+  top:30%;
+  height:52%;
+  transform-style:preserve-3d;
+  z-index:3;
+}
+.flap{
+  position:absolute; inset:0;
+  transform-origin:50% 0%;
+  transform:rotateX(0deg);
+  transition:transform .6s cubic-bezier(.3,.7,.3,1), box-shadow .6s ease;
+  background:linear-gradient(160deg, var(--craft-red) 0%, var(--craft-red-dark) 100%);
+  clip-path:polygon(0% 0%, 100% 0%, 100% 78%, 50% 100%, 0% 78%);
+  box-shadow:0 10px 22px rgba(0,0,0,0.35);
+  backface-visibility:hidden;
+}
+.envelope-page.flap-open .flap{
+  transform:rotateX(-150deg);
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);
+}
+/* pushpin holding the flap, fixed in place above everything */
+.pin{
+  position:absolute; left:50%; top:-8px;
+  width:16px; height:16px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #ff6b6b, #b3222f 60%, #7a1420 100%);
+  box-shadow:0 3px 6px rgba(0,0,0,0.4), inset 0 -2px 3px rgba(0,0,0,0.3);
+  z-index:4;
+}
+
+.env-hint{
+  position:absolute; left:50%; bottom:6%;
+  transform:translateX(-50%);
+  z-index:5;
+  background:#f5ecd8;
+  color:var(--craft-red-dark);
+  font-weight:bold; font-size:10px; letter-spacing:0.5px;
+  text-transform:uppercase;
+  padding:6px 10px;
+  border-radius:2px;
+  box-shadow:0 3px 8px rgba(0,0,0,0.25);
+  transform:translateX(-50%) rotate(-2deg);
+  pointer-events:none;
+}
+
+.env-hearts{
+  position:absolute; left:6%; bottom:14%;
+  font-size:18px;
+  color:var(--craft-red);
+  opacity:0.85;
+  z-index:3;
+  pointer-events:none;
+}
+
+/* ---------------- RIGHT PAGE : CAKE ---------------- */
+.cake-page{ cursor:pointer; }
+
+.cutout-title{
+  position:absolute; left:50%; top:6%;
+  transform:translateX(-50%);
+  z-index:6;
+  text-align:center;
+  font-weight:900;
+  font-size:15px;
+  line-height:1.35;
+  letter-spacing:0.5px;
+  pointer-events:none;
+}
+.cutout-title span{
+  display:inline-block;
+  padding:1px 3px;
+  margin:0 1px;
+  border-radius:2px;
+  box-shadow:0 2px 4px rgba(0,0,0,0.25);
+}
+.cutout-title span:nth-child(6n+1){ background:#ffd1e6; color:#c23b6b; transform:rotate(-6deg); }
+.cutout-title span:nth-child(6n+2){ background:#d7f5c9; color:#3a7a2a; transform:rotate(4deg); }
+.cutout-title span:nth-child(6n+3){ background:#bfe4ff; color:#1c5f8a; transform:rotate(-3deg); }
+.cutout-title span:nth-child(6n+4){ background:#fff4b8; color:#8a6d1c; transform:rotate(5deg); }
+.cutout-title span:nth-child(6n+5){ background:#ffd7b0; color:#a34c17; transform:rotate(-4deg); }
+.cutout-title span:nth-child(6n+0){ background:#e6d2ff; color:#5c2c8a; transform:rotate(3deg); }
 
 .mic-hint{
-  position:absolute; left:0; right:0; top:6%;
+  position:absolute; left:0; right:0; bottom:6%;
   text-align:center; z-index:6;
-  color:#5b3a22; font-weight:bold; font-size:13px; letter-spacing:.5px;
+  color:#5b3a22; font-weight:bold; font-size:11px; letter-spacing:.5px;
   text-shadow:0 1px 3px rgba(255,255,255,0.5);
   transition:opacity .4s ease;
+  padding:0 6%;
 }
 
 .flames{
@@ -159,9 +254,9 @@ html,body{
   background:radial-gradient(circle at 50% 78%, #fffbe6 0%, #ffe27a 26%, #ffb238 52%, #ff7a1a 76%, rgba(255,122,26,0) 82%);
   filter:blur(0.5px) saturate(1.15);
   box-shadow:
-    0 0 10px 3px rgba(255,180,70,0.85),
-    0 0 22px 10px rgba(255,130,40,0.45),
-    0 0 36px 16px rgba(255,100,20,0.2);
+    0 0 8px 2px rgba(255,180,70,0.85),
+    0 0 16px 7px rgba(255,130,40,0.45),
+    0 0 26px 12px rgba(255,100,20,0.2);
   transform-origin:50% 100%;
   animation:flicker 1.4s ease-in-out infinite;
 }
@@ -186,7 +281,7 @@ html,body{
 }
 .smoke{
   position:absolute; left:50%; top:0;
-  width:6px; height:6px; border-radius:50%;
+  width:5px; height:5px; border-radius:50%;
   background:radial-gradient(circle, rgba(160,160,160,0.65), rgba(160,160,160,0) 70%);
   opacity:0;
   pointer-events:none;
@@ -196,27 +291,27 @@ html,body{
 }
 @keyframes smokeRise{
   0%{ opacity:.55; transform:translate(-50%,0) scale(1); }
-  100%{ opacity:0; transform:translate(-50%,-42px) scale(3.4); }
+  100%{ opacity:0; transform:translate(-50%,-34px) scale(3); }
 }
 
 .banner{
-  position:absolute; left:50%; top:14%;
+  position:absolute; left:50%; top:30%;
   transform:translate(-50%,-14px) scale(0.7) rotate(-3deg);
   opacity:0;
   z-index:8;
   background:#fff6e2;
-  padding:12px 20px;
-  border-radius:6px;
-  box-shadow:0 14px 30px rgba(0,0,0,0.4);
+  padding:8px 14px;
+  border-radius:5px;
+  box-shadow:0 12px 26px rgba(0,0,0,0.4);
   font-weight:900;
-  letter-spacing:1px;
-  font-size:22px;
+  letter-spacing:0.5px;
+  font-size:15px;
   color:#c23b4e;
   text-align:center;
   border:2px dashed #e7a6b0;
   pointer-events:none;
   transition:opacity .5s ease, transform .5s cubic-bezier(.2,1.4,.4,1);
-  max-width:82%;
+  max-width:86%;
 }
 .banner.show{
   opacity:1;
@@ -232,30 +327,52 @@ html,body{
 
 <div class="app" id="app">
 
-  <!-- STAGE 3 : CAKE (bottom of the stack, revealed last) -->
-  <div class="screen" id="cakeScreen">
-    <img class="bg" src="cake.png" alt="cake" draggable="false">
-    <div class="mic-hint" id="micHint">blow into the mic 🎤 (or tap the cake)</div>
-    <div class="flames" id="flames">
-      <div class="flame" data-i="1"><span class="smoke"></span></div>
-      <div class="flame" data-i="2"><span class="smoke"></span></div>
-      <div class="flame" data-i="3"><span class="smoke"></span></div>
-    </div>
-    <div class="banner" id="banner">
-      <span>H</span><span>A</span><span>P</span><span>P</span><span>Y</span>&nbsp;
-      <span>B</span><span>I</span><span>R</span><span>T</span><span>H</span><span>D</span><span>A</span><span>Y</span>&nbsp;🎉
-    </div>
-  </div>
+  <!-- THE OPEN SPREAD : envelope (left) + cake (right), side by side, both visible at once -->
+  <div id="spread">
 
-  <!-- STAGE 2 : ENVELOPE (letter text is baked into envelope.png itself) -->
-  <div class="screen" id="envelopeScreen">
-    <div class="env-inner">
+    <!-- LEFT PAGE : ENVELOPE -->
+    <section class="page envelope-page" id="envelopePage">
       <img class="bg" src="envelope.png" alt="envelope" draggable="false">
-    </div>
-    <div class="env-hint" id="envHint">tap to read • tap again to continue</div>
+      <span class="sticker-star" style="left:8%; top:6%;"></span>
+      <span class="sticker-star" style="left:20%; top:11%; transform:scale(0.8);"></span>
+      <span class="sticker-star" style="left:10%; bottom:20%; transform:scale(0.85);"></span>
+      <div class="env-hearts">♡ ♡</div>
+
+      <div class="flap-wrap">
+        <div class="flap"></div>
+        <div class="pin"></div>
+      </div>
+
+      <div class="env-hint">click letter to open and close</div>
+    </section>
+
+    <!-- RIGHT PAGE : CAKE -->
+    <section class="page cake-page" id="cakePage">
+      <img class="bg" src="cake.png" alt="cake" draggable="false">
+
+      <div class="cutout-title">
+        <span>b</span><span>l</span><span>o</span><span>w</span>&nbsp;
+        <span>t</span><span>h</span><span>e</span>&nbsp;
+        <span>c</span><span>a</span><span>n</span><span>d</span><span>l</span><span>e</span><span>s</span>
+      </div>
+
+      <div class="flames" id="flames">
+        <div class="flame" data-i="1"><span class="smoke"></span></div>
+        <div class="flame" data-i="2"><span class="smoke"></span></div>
+        <div class="flame" data-i="3"><span class="smoke"></span></div>
+      </div>
+
+      <div class="mic-hint" id="micHint">blow into the mic 🎤 (or tap the cake)</div>
+
+      <div class="banner" id="banner">
+        <span>H</span><span>A</span><span>P</span><span>P</span><span>Y</span>&nbsp;
+        <span>B</span><span>I</span><span>R</span><span>T</span><span>H</span><span>D</span><span>A</span><span>Y</span>&nbsp;🎉
+      </div>
+    </section>
+
   </div>
 
-  <!-- STAGE 1 : COVER -->
+  <!-- COVER, sits on top and swings away -->
   <div class="screen" id="coverScreen">
     <div class="cover-face">
       <img class="bg" src="cover.png" alt="cover" draggable="false">
@@ -271,9 +388,8 @@ html,body{
   "use strict";
 
   var coverScreen = document.getElementById('coverScreen');
-  var envelopeScreen = document.getElementById('envelopeScreen');
-  var envHint = document.getElementById('envHint');
-  var cakeScreen = document.getElementById('cakeScreen');
+  var envelopePage = document.getElementById('envelopePage');
+  var cakePage = document.getElementById('cakePage');
 
   /* ---------------- STAGE 1 : the 3D book cover hinge ---------------- */
   var coverOpened = false;
@@ -282,49 +398,127 @@ html,body{
     coverOpened = true;
     coverScreen.classList.add('cover-open');
     // once the swing-open + fade transition finishes, remove it from the
-    // layout entirely so it can never block touches on the layers beneath
+    // layout entirely so it can never block touches on the spread beneath
     setTimeout(function(){
       coverScreen.style.display = 'none';
+      startMic();
     }, 1000);
   });
 
-  /* ---------------- STAGE 2 : envelope click-tracking state machine ---------------- */
-  let clickCount = 0;
-
-  envelopeScreen.addEventListener('click', function(){
+  /* ---------------- ENVELOPE : persistent open/close flap toggle ---------------- */
+  envelopePage.addEventListener('click', function(){
     if(!coverOpened) return;
-
-    clickCount++;
-
-    if(clickCount === 1){
-      // CLICK 1: zoom & read
-      envelopeScreen.classList.add('envelope-zoomed');
-      envHint.style.opacity = '0';
-    } else if(clickCount === 2){
-      // CLICK 2: clear out & reveal cake
-      envelopeScreen.classList.remove('envelope-zoomed');
-      envelopeScreen.classList.add('envelope-leaving');
-
-      setTimeout(function(){
-        // CRUCIAL FIX: physically remove the envelope layer so it can
-        // never block or hide the cake page underneath it
-        envelopeScreen.style.display = 'none';
-
-        // reveal the cake at the exact same moment
-        cakeScreen.classList.add('cake-visible');
-        startMic();
-      }, 600);
-    }
-    // any click after the 2nd is ignored — the envelope is already gone
+    envelopePage.classList.toggle('flap-open');
   });
 
-  /* ---------------- STAGE 3 : candles / mic blow detection ---------------- */
+  /* ---------------- CAKE : candles / mic blow detection ---------------- */
   var flameEls = Array.prototype.slice.call(document.querySelectorAll('.flame'));
   var banner = document.getElementById('banner');
   var micHint = document.getElementById('micHint');
   var micReady = false;
   var micFailed = false;
   var micStarted = false;
+  var celebrated = false;
+  var audioCtx, analyser, dataArray, rafId;
+
+  function litFlames(){
+    return flameEls.filter(function(f){ return !f.classList.contains('out'); });
+  }
+
+  function extinguishOne(){
+    var remaining = litFlames();
+    if(!remaining.length) return false;
+    remaining[0].classList.add('out');
+    if(!litFlames().length) celebrate();
+    return true;
+  }
+
+  function celebrate(){
+    if(celebrated) return;
+    celebrated = true;
+    micHint.style.opacity = '0';
+    stopMic();
+    var end = Date.now() + 1800;
+    (function frame(){
+      confetti({ particleCount: 6, angle: 60, spread: 65, origin: { x: 0, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
+      confetti({ particleCount: 6, angle: 120, spread: 65, origin: { x: 1, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
+    confetti({ particleCount: 140, spread: 120, origin: { y: 0.5 }, startVelocity: 45, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c','#a3d8f4'] });
+    setTimeout(function(){ banner.classList.add('show'); }, 250);
+  }
+
+  // tap fallback
+  flameEls.forEach(function(f){
+    f.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(!f.classList.contains('out')){
+        f.classList.add('out');
+        if(!litFlames().length) celebrate();
+      }
+    });
+  });
+  cakePage.addEventListener('click', function(){
+    if(!micReady) extinguishOne();
+  });
+
+  function stopMic(){
+    if(rafId) cancelAnimationFrame(rafId);
+    if(audioCtx && audioCtx.state !== 'closed'){
+      try{ audioCtx.close(); }catch(err){}
+    }
+  }
+
+  function startMic(){
+    if(micStarted || celebrated) return;
+    micStarted = true;
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      micFailed = true;
+      micHint.textContent = 'tap the cake to blow out the candles';
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio:true })
+      .then(function(stream){
+        micReady = true;
+        micHint.textContent = 'blow into the mic 🎤';
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.6;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        source.connect(analyser);
+
+        var blowStreak = 0;
+        var lastExtinguish = 0;
+
+        (function poll(){
+          if(celebrated) return;
+          analyser.getByteFrequencyData(dataArray);
+          var sum = 0;
+          for(var i=0;i<dataArray.length;i++) sum += dataArray[i];
+          var avg = sum / dataArray.length;
+
+          if(avg > 34){ blowStreak++; } else { blowStreak = 0; }
+
+          var now = Date.now();
+          if(blowStreak > 4 && now - lastExtinguish > 260){
+            lastExtinguish = now;
+            extinguishOne();
+          }
+          rafId = requestAnimationFrame(poll);
+        })();
+      })
+      .catch(function(){
+        micFailed = true;
+        micHint.textContent = 'tap the cake to blow out the candles';
+      });
+  }
+
+})();
+</script>
+</body>
+</html>lse;
   var celebrated = false;
   var audioCtx, analyser, dataArray, rafId;
 
