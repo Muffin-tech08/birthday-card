@@ -2,39 +2,576 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Happy Birthday</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Caveat:wght@600;700&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.0/dist/confetti.browser.min.js"></script>
 <style>
 
-  /* =====================================================================
-     🕯️ CANDLE FLAMES CONTROL PANEL
-     Tune these to line the 3 CSS flames up with the 3 hand-drawn candles
-     on your cake.png artwork. Nothing else in the file needs to change.
+/* =====================================================================
+   🕯️  FLAMES TUNING PANEL
+   Adjust these four numbers to pixel-align the 3 flames over the wicks
+   drawn on cake.png. Nothing else in the file needs to change.
+   ===================================================================== */
+:root{
+  --flame-bottom: 24%;   /* distance of the flame cluster from the bottom edge of the cake page */
+  --flame-gap:    26px;  /* horizontal spacing between each of the 3 flames */
+  --flame-width:  16px;  /* width of a single flame */
+  --flame-height: 28px;  /* height of a single flame */
 
-     --flame-bottom : distance from the BOTTOM of the right (cake) page up
-                       to the row of flames. Increase to move flames UP,
-                       decrease to move them DOWN, onto the drawn wicks.
-     --flame-left    : horizontal position of the CENTER of the flame
-                       cluster, as a % of the cake page's width. Increase
-                       to shift the cluster right, decrease to shift left.
-     --flame-gap      : horizontal spacing BETWEEN each of the 3 flames.
-                       Increase to spread them apart, decrease to bunch
-                       them closer, matching the spacing of your candles.
-     ===================================================================== */
-  :root{
-    --flame-bottom: 46%;   /* ↕ vertical position of the flame row       */
-    --flame-left:   50%;   /* ↔ horizontal center of the flame cluster   */
-    --flame-gap:    34px;  /* ↔ spacing between the 3 flames             */
+  --craft-tan:   #cbb293;
+  --craft-red:   #8a1f2d;
+  --craft-red-dark:#6c1622;
+}
+/* ===================================================================== */
 
-    /* secondary tuning knobs (optional) */
-    --flame-width:  16px;
-    --flame-height: 30px;
+*{ box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+html,body{
+  margin:0; padding:0;
+  width:100%; height:100%;
+  overflow:hidden;
+  overscroll-behavior:none;
+  touch-action:none;
+  position:fixed;
+  inset:0;
+  background:var(--craft-tan);
+  font-family:'Georgia','Times New Roman',serif;
+}
+
+/* ---------------------------------------------------------------------
+   STAGE / DEVICE FRAME
+   The card keeps a phone-like 9:16 portrait ratio no matter the real
+   viewport. On a tall narrow phone it fills almost the whole screen.
+   On a laptop or a phone rotated to landscape, the height becomes the
+   limiting dimension, so the card shrinks to a centered, framed "phone"
+   with tan craft-paper letterboxing around it instead of stretching
+   the artwork edge-to-edge and distorting/over-cropping it.
+   --------------------------------------------------------------------- */
+.stage{
+  position:fixed; inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--craft-tan);
+  padding:10px;
+}
+
+.app{
+  position:relative;
+  width:min(94vw, calc(94dvh * 0.5625));
+  height:min(94dvh, calc(94vw / 0.5625));
+  max-width:520px;
+  max-height:920px;
+  border-radius:16px;
+  overflow:hidden;
+  background:var(--craft-tan);
+  box-shadow:
+    0 30px 70px rgba(0,0,0,0.45),
+    0 6px 16px rgba(0,0,0,0.25);
+}
+
+/* little red sticker stars scattered on the craft-paper background,
+   same touch as the reference scrapbook */
+.sticker-star{
+  position:absolute;
+  width:16px; height:16px;
+  background:var(--craft-red);
+  clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+  opacity:0.9;
+  z-index:2;
+  pointer-events:none;
+}
+
+/* ---------- shared full-screen layer rules ---------- */
+.screen{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+}
+.screen img.bg{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+  display:block;
+  pointer-events:none;
+}
+
+/* ================= STAGE 1 : COVER ================= */
+#coverScreen{
+  z-index:30;
+  cursor:pointer;
+  perspective:1200px;
+}
+#coverScreen .cover-face{
+  position:absolute; inset:0;
+  transform-origin:left center;
+  transform-style:preserve-3d;
+  transform:rotateY(0deg);
+  transition:transform 1s cubic-bezier(.6,.02,.2,1), opacity .5s ease .5s;
+  box-shadow:6px 0 30px rgba(0,0,0,0.35);
+}
+#coverScreen .tap-hint{
+  position:absolute; left:0; right:0; bottom:6%;
+  text-align:center;
+  color:#fff; font-weight:bold; letter-spacing:1.5px; font-size:14px;
+  text-shadow:0 2px 6px rgba(0,0,0,0.6);
+  animation:pulse 1.8s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes pulse{
+  0%,100%{ opacity:.55; transform:translateY(0); }
+  50%{ opacity:1; transform:translateY(-4px); }
+}
+#coverScreen.cover-open .cover-face{
+  transform:rotateY(-110deg);
+  opacity:0;
+}
+
+/* ================= STAGE 2 : THE OPEN SPREAD (envelope + cake side-by-side) ================= */
+#spread{
+  position:absolute; inset:0;
+  z-index:10;
+  display:flex;
+  width:100%; height:100%;
+}
+.page{
+  position:relative;
+  flex:1 1 50%;
+  height:100%;
+  overflow:hidden;
+}
+/* soft center-fold shadow so the two halves read as a bound book */
+#spread::after{
+  content:"";
+  position:absolute; top:0; bottom:0; left:50%;
+  width:22px; margin-left:-11px;
+  background:linear-gradient(to right, rgba(0,0,0,0.22), rgba(0,0,0,0) 45%, rgba(0,0,0,0) 55%, rgba(0,0,0,0.22));
+  z-index:9; pointer-events:none;
+}
+
+/* ---------------- LEFT PAGE : ENVELOPE + POPPING LETTER + FLAP ---------------- */
+.envelope-page{
+  cursor:pointer;
+  perspective:900px;
+}
+
+/* letter.png, tucked small behind the flap, pops up big with a bouncy
+   overshoot + lifting shadow the moment the flap opens */
+.letter-pop{
+  position:absolute;
+  left:6%; right:6%;
+  top:16%;
+  height:70%;
+  z-index:2;
+  transform-origin:50% 100%;
+  transform:scale(0.68) translateY(10%);
+  transition:transform .55s cubic-bezier(.34,1.56,.64,1), filter .55s cubic-bezier(.34,1.56,.64,1);
+  filter:drop-shadow(0 0 0 rgba(0,0,0,0));
+}
+.letter-pop img{
+  width:100%; height:100%;
+  object-fit:contain;
+  display:block;
+  pointer-events:none;
+}
+.envelope-page.flap-open .letter-pop{
+  /* the back-eased transition overshoots past this then settles,
+     which is what gives the letter its "pop" */
+  transform:scale(1.04) translateY(-8%);
+  filter:drop-shadow(0 18px 30px rgba(0,0,0,0.45));
+}
+
+/* the flap is a pure-CSS pocket lid folding open/closed on top of the letter */
+.flap-wrap{
+  position:absolute;
+  left:8%; right:8%;
+  top:30%;
+  height:52%;
+  transform-style:preserve-3d;
+  z-index:3;
+}
+.flap{
+  position:absolute; inset:0;
+  transform-origin:50% 0%;
+  transform:rotateX(0deg);
+  transition:transform .6s cubic-bezier(.3,.7,.3,1), box-shadow .6s ease;
+  background:linear-gradient(160deg, var(--craft-red) 0%, var(--craft-red-dark) 100%);
+  clip-path:polygon(0% 0%, 100% 0%, 100% 78%, 50% 100%, 0% 78%);
+  box-shadow:0 10px 22px rgba(0,0,0,0.35);
+  backface-visibility:hidden;
+}
+.envelope-page.flap-open .flap{
+  transform:rotateX(-150deg);
+  box-shadow:0 2px 8px rgba(0,0,0,0.15);
+}
+/* pushpin holding the flap, fixed in place above everything */
+.pin{
+  position:absolute; left:50%; top:-8px;
+  width:16px; height:16px;
+  transform:translateX(-50%);
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 30%, #ff6b6b, #b3222f 60%, #7a1420 100%);
+  box-shadow:0 3px 6px rgba(0,0,0,0.4), inset 0 -2px 3px rgba(0,0,0,0.3);
+  z-index:4;
+}
+
+.env-hint{
+  position:absolute; left:50%; bottom:6%;
+  transform:translateX(-50%) rotate(-2deg);
+  z-index:5;
+  background:#f5ecd8;
+  color:var(--craft-red-dark);
+  font-weight:bold; font-size:10px; letter-spacing:0.5px;
+  text-transform:uppercase;
+  padding:6px 10px;
+  border-radius:2px;
+  box-shadow:0 3px 8px rgba(0,0,0,0.25);
+  pointer-events:none;
+}
+
+.env-hearts{
+  position:absolute; left:6%; bottom:14%;
+  font-size:18px;
+  color:var(--craft-red);
+  opacity:0.85;
+  z-index:3;
+  pointer-events:none;
+}
+
+/* ---------------- RIGHT PAGE : CAKE ---------------- */
+.cake-page{ cursor:pointer; }
+
+.cutout-title{
+  position:absolute; left:50%; top:6%;
+  transform:translateX(-50%);
+  z-index:6;
+  text-align:center;
+  font-weight:900;
+  font-size:15px;
+  line-height:1.35;
+  letter-spacing:0.5px;
+  pointer-events:none;
+}
+.cutout-title span{
+  display:inline-block;
+  padding:1px 3px;
+  margin:0 1px;
+  border-radius:2px;
+  box-shadow:0 2px 4px rgba(0,0,0,0.25);
+}
+.cutout-title span:nth-child(6n+1){ background:#ffd1e6; color:#c23b6b; transform:rotate(-6deg); }
+.cutout-title span:nth-child(6n+2){ background:#d7f5c9; color:#3a7a2a; transform:rotate(4deg); }
+.cutout-title span:nth-child(6n+3){ background:#bfe4ff; color:#1c5f8a; transform:rotate(-3deg); }
+.cutout-title span:nth-child(6n+4){ background:#fff4b8; color:#8a6d1c; transform:rotate(5deg); }
+.cutout-title span:nth-child(6n+5){ background:#ffd7b0; color:#a34c17; transform:rotate(-4deg); }
+.cutout-title span:nth-child(6n+0){ background:#e6d2ff; color:#5c2c8a; transform:rotate(3deg); }
+
+.mic-hint{
+  position:absolute; left:0; right:0; bottom:6%;
+  text-align:center; z-index:6;
+  color:#5b3a22; font-weight:bold; font-size:11px; letter-spacing:.5px;
+  text-shadow:0 1px 3px rgba(255,255,255,0.5);
+  transition:opacity .4s ease;
+  padding:0 6%;
+}
+
+.flames{
+  position:absolute;
+  left:50%; bottom:var(--flame-bottom);
+  transform:translateX(-50%);
+  display:flex;
+  align-items:flex-end;
+  gap:var(--flame-gap);
+  z-index:5;
+}
+.flame{
+  width:var(--flame-width);
+  height:var(--flame-height);
+  position:relative;
+  cursor:pointer;
+}
+.flame::before{
+  content:"";
+  position:absolute; left:0; bottom:0;
+  width:100%; height:100%;
+  border-radius:50% 50% 50% 50% / 65% 65% 35% 35%;
+  background:radial-gradient(circle at 50% 78%, #fffbe6 0%, #ffe27a 26%, #ffb238 52%, #ff7a1a 76%, rgba(255,122,26,0) 82%);
+  filter:blur(0.5px) saturate(1.15);
+  box-shadow:
+    0 0 8px 2px rgba(255,180,70,0.85),
+    0 0 16px 7px rgba(255,130,40,0.45),
+    0 0 26px 12px rgba(255,100,20,0.2);
+  transform-origin:50% 100%;
+  animation:flicker 1.4s ease-in-out infinite;
+}
+.flame:nth-child(1)::before{ animation-delay:0s; }
+.flame:nth-child(2)::before{ animation-delay:.2s; }
+.flame:nth-child(3)::before{ animation-delay:.35s; }
+
+@keyframes flicker{
+  0%{   transform:scale(1,1)      rotate(0deg); }
+  20%{  transform:scale(0.9,1.1)  rotate(-4deg); }
+  40%{  transform:scale(1.08,0.92) rotate(3deg); }
+  60%{  transform:scale(0.94,1.06) rotate(-3deg); }
+  80%{  transform:scale(1.05,0.95) rotate(4deg); }
+  100%{ transform:scale(1,1)      rotate(0deg); }
+}
+
+.flame.out::before{
+  animation:none;
+  opacity:0;
+  transform:scale(0.3,0.1);
+  transition:opacity .35s ease, transform .35s ease;
+}
+.smoke{
+  position:absolute; left:50%; top:0;
+  width:5px; height:5px; border-radius:50%;
+  background:radial-gradient(circle, rgba(160,160,160,0.65), rgba(160,160,160,0) 70%);
+  opacity:0;
+  pointer-events:none;
+}
+.flame.out .smoke{
+  animation:smokeRise 1.1s ease-out forwards;
+}
+@keyframes smokeRise{
+  0%{ opacity:.55; transform:translate(-50%,0) scale(1); }
+  100%{ opacity:0; transform:translate(-50%,-34px) scale(3); }
+}
+
+.banner{
+  position:absolute; left:50%; top:30%;
+  transform:translate(-50%,-14px) scale(0.7) rotate(-3deg);
+  opacity:0;
+  z-index:8;
+  background:#fff6e2;
+  padding:8px 14px;
+  border-radius:5px;
+  box-shadow:0 12px 26px rgba(0,0,0,0.4);
+  font-weight:900;
+  letter-spacing:0.5px;
+  font-size:15px;
+  color:#c23b4e;
+  text-align:center;
+  border:2px dashed #e7a6b0;
+  pointer-events:none;
+  transition:opacity .5s ease, transform .5s cubic-bezier(.2,1.4,.4,1);
+  max-width:86%;
+}
+.banner.show{
+  opacity:1;
+  transform:translate(-50%,0) scale(1) rotate(-2deg);
+}
+.banner span{ display:inline-block; transform:rotate(1deg); }
+.banner span:nth-child(2n){ transform:rotate(-2deg); }
+.banner span:nth-child(3n){ transform:rotate(2.5deg); }
+
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="app" id="app">
+
+    <!-- THE OPEN SPREAD : envelope (left) + cake (right), side by side, both visible at once -->
+    <div id="spread">
+
+      <!-- LEFT PAGE : ENVELOPE -->
+      <section class="page envelope-page" id="envelopePage">
+        <img class="bg" src="envelope.png" alt="envelope" draggable="false">
+        <span class="sticker-star" style="left:8%; top:6%;"></span>
+        <span class="sticker-star" style="left:20%; top:11%; transform:scale(0.8);"></span>
+        <span class="sticker-star" style="left:10%; bottom:20%; transform:scale(0.85);"></span>
+        <div class="env-hearts">♡ ♡</div>
+
+        <div class="letter-pop">
+          <img src="letter.png" alt="letter" draggable="false">
+        </div>
+
+        <div class="flap-wrap">
+          <div class="flap"></div>
+          <div class="pin"></div>
+        </div>
+
+        <div class="env-hint">click letter to open and close</div>
+      </section>
+
+      <!-- RIGHT PAGE : CAKE -->
+      <section class="page cake-page" id="cakePage">
+        <img class="bg" src="cake.png" alt="cake" draggable="false">
+
+        <div class="cutout-title">
+          <span>b</span><span>l</span><span>o</span><span>w</span>&nbsp;
+          <span>t</span><span>h</span><span>e</span>&nbsp;
+          <span>c</span><span>a</span><span>n</span><span>d</span><span>l</span><span>e</span><span>s</span>
+        </div>
+
+        <div class="flames" id="flames">
+          <div class="flame" data-i="1"><span class="smoke"></span></div>
+          <div class="flame" data-i="2"><span class="smoke"></span></div>
+          <div class="flame" data-i="3"><span class="smoke"></span></div>
+        </div>
+
+        <div class="mic-hint" id="micHint">blow into the mic 🎤 (or tap the cake)</div>
+
+        <div class="banner" id="banner">
+          <span>H</span><span>A</span><span>P</span><span>P</span><span>Y</span>&nbsp;
+          <span>B</span><span>I</span><span>R</span><span>T</span><span>H</span><span>D</span><span>A</span><span>Y</span>&nbsp;🎉
+        </div>
+      </section>
+
+    </div>
+
+    <!-- COVER, sits on top and swings away -->
+    <div class="screen" id="coverScreen">
+      <div class="cover-face">
+        <img class="bg" src="cover.png" alt="cover" draggable="false">
+        <div class="tap-hint">tap to open</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.3/confetti.browser.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var coverScreen = document.getElementById('coverScreen');
+  var envelopePage = document.getElementById('envelopePage');
+  var cakePage = document.getElementById('cakePage');
+
+  /* ---------------- STAGE 1 : the 3D book cover hinge ---------------- */
+  var coverOpened = false;
+  coverScreen.addEventListener('click', function(){
+    if(coverOpened) return;
+    coverOpened = true;
+    coverScreen.classList.add('cover-open');
+    // once the swing-open + fade transition finishes, remove it from the
+    // layout entirely so it can never block touches on the spread beneath
+    setTimeout(function(){
+      coverScreen.style.display = 'none';
+      startMic();
+    }, 1000);
+  });
+
+  /* ---------------- ENVELOPE : persistent open/close flap + letter pop ---------------- */
+  envelopePage.addEventListener('click', function(){
+    if(!coverOpened) return;
+    envelopePage.classList.toggle('flap-open');
+  });
+
+  /* ---------------- CAKE : candles / mic blow detection ---------------- */
+  var flameEls = Array.prototype.slice.call(document.querySelectorAll('.flame'));
+  var banner = document.getElementById('banner');
+  var micHint = document.getElementById('micHint');
+  var micReady = false;
+  var micFailed = false;
+  var micStarted = false;
+  var celebrated = false;
+  var audioCtx, analyser, dataArray, rafId;
+
+  function litFlames(){
+    return flameEls.filter(function(f){ return !f.classList.contains('out'); });
   }
-  /* ================= END CANDLE FLAMES CONTROL PANEL ================= */
+
+  function extinguishOne(){
+    var remaining = litFlames();
+    if(!remaining.length) return false;
+    remaining[0].classList.add('out');
+    if(!litFlames().length) celebrate();
+    return true;
+  }
+
+  function celebrate(){
+    if(celebrated) return;
+    celebrated = true;
+    micHint.style.opacity = '0';
+    stopMic();
+    var end = Date.now() + 1800;
+    (function frame(){
+      confetti({ particleCount: 6, angle: 60, spread: 65, origin: { x: 0, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
+      confetti({ particleCount: 6, angle: 120, spread: 65, origin: { x: 1, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
+      if (Date.now() < end) requestAnimationFrame(frame);
+    })();
+    confetti({ particleCount: 140, spread: 120, origin: { y: 0.5 }, startVelocity: 45, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c','#a3d8f4'] });
+    setTimeout(function(){ banner.classList.add('show'); }, 250);
+  }
+
+  // tap fallback
+  flameEls.forEach(function(f){
+    f.addEventListener('click', function(e){
+      e.stopPropagation();
+      if(!f.classList.contains('out')){
+        f.classList.add('out');
+        if(!litFlames().length) celebrate();
+      }
+    });
+  });
+  cakePage.addEventListener('click', function(){
+    if(!micReady) extinguishOne();
+  });
+
+  function stopMic(){
+    if(rafId) cancelAnimationFrame(rafId);
+    if(audioCtx && audioCtx.state !== 'closed'){
+      try{ audioCtx.close(); }catch(err){}
+    }
+  }
+
+  function startMic(){
+    if(micStarted || celebrated) return;
+    micStarted = true;
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      micFailed = true;
+      micHint.textContent = 'tap the cake to blow out the candles';
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio:true })
+      .then(function(stream){
+        micReady = true;
+        micHint.textContent = 'blow into the mic 🎤';
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.6;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        source.connect(analyser);
+
+        var blowStreak = 0;
+        var lastExtinguish = 0;
+
+        (function poll(){
+          if(celebrated) return;
+          analyser.getByteFrequencyData(dataArray);
+          var sum = 0;
+          for(var i=0;i<dataArray.length;i++) sum += dataArray[i];
+          var avg = sum / dataArray.length;
+
+          if(avg > 34){ blowStreak++; } else { blowStreak = 0; }
+
+          var now = Date.now();
+          if(blowStreak > 4 && now - lastExtinguish > 260){
+            lastExtinguish = now;
+            extinguishOne();
+          }
+          rafId = requestAnimationFrame(poll);
+        })();
+      })
+      .catch(function(){
+        micFailed = true;
+        micHint.textContent = 'tap the cake to blow out the candles';
+      });
+  }
+
+})();
+</script>
+</body>
+</html>  /* ================= END CANDLE FLAMES CONTROL PANEL ================= */
 
   :root{
     --paper-tan:#cbb293;
