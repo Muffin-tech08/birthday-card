@@ -36,13 +36,36 @@ html,body{
   font-family:'Georgia','Times New Roman',serif;
 }
 
-.app{
-  position:fixed;
-  inset:0;
-  width:100%;
-  height:100dvh;
+/* ---------------------------------------------------------------------
+   STAGE / DEVICE FRAME
+   The card keeps a phone-like 9:16 portrait ratio no matter the real
+   viewport. On a tall narrow phone it fills almost the whole screen.
+   On a laptop or a phone rotated to landscape, the height becomes the
+   limiting dimension, so the card shrinks to a centered, framed "phone"
+   with tan craft-paper letterboxing around it instead of stretching
+   the artwork edge-to-edge and distorting/over-cropping it.
+   --------------------------------------------------------------------- */
+.stage{
+  position:fixed; inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   background:var(--craft-tan);
+  padding:10px;
+}
+
+.app{
+  position:relative;
+  width:min(94vw, calc(94dvh * 0.5625));
+  height:min(94dvh, calc(94vw / 0.5625));
+  max-width:520px;
+  max-height:920px;
+  border-radius:16px;
   overflow:hidden;
+  background:var(--craft-tan);
+  box-shadow:
+    0 30px 70px rgba(0,0,0,0.45),
+    0 6px 16px rgba(0,0,0,0.25);
 }
 
 /* little red sticker stars scattered on the craft-paper background,
@@ -129,14 +152,39 @@ html,body{
   z-index:9; pointer-events:none;
 }
 
-/* ---------------- LEFT PAGE : ENVELOPE + FLAP + LETTER ---------------- */
+/* ---------------- LEFT PAGE : ENVELOPE + POPPING LETTER + FLAP ---------------- */
 .envelope-page{
   cursor:pointer;
   perspective:900px;
 }
 
-/* the letter text lives on envelope.png itself; the flap below is a
-   pure-CSS pocket lid that folds open/closed on top of it */
+/* letter.png, tucked small behind the flap, pops up big with a bouncy
+   overshoot + lifting shadow the moment the flap opens */
+.letter-pop{
+  position:absolute;
+  left:6%; right:6%;
+  top:16%;
+  height:70%;
+  z-index:2;
+  transform-origin:50% 100%;
+  transform:scale(0.68) translateY(10%);
+  transition:transform .55s cubic-bezier(.34,1.56,.64,1), filter .55s cubic-bezier(.34,1.56,.64,1);
+  filter:drop-shadow(0 0 0 rgba(0,0,0,0));
+}
+.letter-pop img{
+  width:100%; height:100%;
+  object-fit:contain;
+  display:block;
+  pointer-events:none;
+}
+.envelope-page.flap-open .letter-pop{
+  /* the back-eased transition overshoots past this then settles,
+     which is what gives the letter its "pop" */
+  transform:scale(1.04) translateY(-8%);
+  filter:drop-shadow(0 18px 30px rgba(0,0,0,0.45));
+}
+
+/* the flap is a pure-CSS pocket lid folding open/closed on top of the letter */
 .flap-wrap{
   position:absolute;
   left:8%; right:8%;
@@ -172,7 +220,7 @@ html,body{
 
 .env-hint{
   position:absolute; left:50%; bottom:6%;
-  transform:translateX(-50%);
+  transform:translateX(-50%) rotate(-2deg);
   z-index:5;
   background:#f5ecd8;
   color:var(--craft-red-dark);
@@ -181,7 +229,6 @@ html,body{
   padding:6px 10px;
   border-radius:2px;
   box-shadow:0 3px 8px rgba(0,0,0,0.25);
-  transform:translateX(-50%) rotate(-2deg);
   pointer-events:none;
 }
 
@@ -325,61 +372,67 @@ html,body{
 </head>
 <body>
 
-<div class="app" id="app">
+<div class="stage">
+  <div class="app" id="app">
 
-  <!-- THE OPEN SPREAD : envelope (left) + cake (right), side by side, both visible at once -->
-  <div id="spread">
+    <!-- THE OPEN SPREAD : envelope (left) + cake (right), side by side, both visible at once -->
+    <div id="spread">
 
-    <!-- LEFT PAGE : ENVELOPE -->
-    <section class="page envelope-page" id="envelopePage">
-      <img class="bg" src="envelope.png" alt="envelope" draggable="false">
-      <span class="sticker-star" style="left:8%; top:6%;"></span>
-      <span class="sticker-star" style="left:20%; top:11%; transform:scale(0.8);"></span>
-      <span class="sticker-star" style="left:10%; bottom:20%; transform:scale(0.85);"></span>
-      <div class="env-hearts">♡ ♡</div>
+      <!-- LEFT PAGE : ENVELOPE -->
+      <section class="page envelope-page" id="envelopePage">
+        <img class="bg" src="envelope.png" alt="envelope" draggable="false">
+        <span class="sticker-star" style="left:8%; top:6%;"></span>
+        <span class="sticker-star" style="left:20%; top:11%; transform:scale(0.8);"></span>
+        <span class="sticker-star" style="left:10%; bottom:20%; transform:scale(0.85);"></span>
+        <div class="env-hearts">♡ ♡</div>
 
-      <div class="flap-wrap">
-        <div class="flap"></div>
-        <div class="pin"></div>
-      </div>
+        <div class="letter-pop">
+          <img src="letter.png" alt="letter" draggable="false">
+        </div>
 
-      <div class="env-hint">click letter to open and close</div>
-    </section>
+        <div class="flap-wrap">
+          <div class="flap"></div>
+          <div class="pin"></div>
+        </div>
 
-    <!-- RIGHT PAGE : CAKE -->
-    <section class="page cake-page" id="cakePage">
-      <img class="bg" src="cake.png" alt="cake" draggable="false">
+        <div class="env-hint">click letter to open and close</div>
+      </section>
 
-      <div class="cutout-title">
-        <span>b</span><span>l</span><span>o</span><span>w</span>&nbsp;
-        <span>t</span><span>h</span><span>e</span>&nbsp;
-        <span>c</span><span>a</span><span>n</span><span>d</span><span>l</span><span>e</span><span>s</span>
-      </div>
+      <!-- RIGHT PAGE : CAKE -->
+      <section class="page cake-page" id="cakePage">
+        <img class="bg" src="cake.png" alt="cake" draggable="false">
 
-      <div class="flames" id="flames">
-        <div class="flame" data-i="1"><span class="smoke"></span></div>
-        <div class="flame" data-i="2"><span class="smoke"></span></div>
-        <div class="flame" data-i="3"><span class="smoke"></span></div>
-      </div>
+        <div class="cutout-title">
+          <span>b</span><span>l</span><span>o</span><span>w</span>&nbsp;
+          <span>t</span><span>h</span><span>e</span>&nbsp;
+          <span>c</span><span>a</span><span>n</span><span>d</span><span>l</span><span>e</span><span>s</span>
+        </div>
 
-      <div class="mic-hint" id="micHint">blow into the mic 🎤 (or tap the cake)</div>
+        <div class="flames" id="flames">
+          <div class="flame" data-i="1"><span class="smoke"></span></div>
+          <div class="flame" data-i="2"><span class="smoke"></span></div>
+          <div class="flame" data-i="3"><span class="smoke"></span></div>
+        </div>
 
-      <div class="banner" id="banner">
-        <span>H</span><span>A</span><span>P</span><span>P</span><span>Y</span>&nbsp;
-        <span>B</span><span>I</span><span>R</span><span>T</span><span>H</span><span>D</span><span>A</span><span>Y</span>&nbsp;🎉
-      </div>
-    </section>
+        <div class="mic-hint" id="micHint">blow into the mic 🎤 (or tap the cake)</div>
 
-  </div>
+        <div class="banner" id="banner">
+          <span>H</span><span>A</span><span>P</span><span>P</span><span>Y</span>&nbsp;
+          <span>B</span><span>I</span><span>R</span><span>T</span><span>H</span><span>D</span><span>A</span><span>Y</span>&nbsp;🎉
+        </div>
+      </section>
 
-  <!-- COVER, sits on top and swings away -->
-  <div class="screen" id="coverScreen">
-    <div class="cover-face">
-      <img class="bg" src="cover.png" alt="cover" draggable="false">
-      <div class="tap-hint">tap to open</div>
     </div>
-  </div>
 
+    <!-- COVER, sits on top and swings away -->
+    <div class="screen" id="coverScreen">
+      <div class="cover-face">
+        <img class="bg" src="cover.png" alt="cover" draggable="false">
+        <div class="tap-hint">tap to open</div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.3/confetti.browser.min.js"></script>
@@ -405,7 +458,7 @@ html,body{
     }, 1000);
   });
 
-  /* ---------------- ENVELOPE : persistent open/close flap toggle ---------------- */
+  /* ---------------- ENVELOPE : persistent open/close flap + letter pop ---------------- */
   envelopePage.addEventListener('click', function(){
     if(!coverOpened) return;
     envelopePage.classList.toggle('flap-open');
@@ -459,107 +512,6 @@ html,body{
     });
   });
   cakePage.addEventListener('click', function(){
-    if(!micReady) extinguishOne();
-  });
-
-  function stopMic(){
-    if(rafId) cancelAnimationFrame(rafId);
-    if(audioCtx && audioCtx.state !== 'closed'){
-      try{ audioCtx.close(); }catch(err){}
-    }
-  }
-
-  function startMic(){
-    if(micStarted || celebrated) return;
-    micStarted = true;
-    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      micFailed = true;
-      micHint.textContent = 'tap the cake to blow out the candles';
-      return;
-    }
-    navigator.mediaDevices.getUserMedia({ audio:true })
-      .then(function(stream){
-        micReady = true;
-        micHint.textContent = 'blow into the mic 🎤';
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        var source = audioCtx.createMediaStreamSource(stream);
-        analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 512;
-        analyser.smoothingTimeConstant = 0.6;
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-        source.connect(analyser);
-
-        var blowStreak = 0;
-        var lastExtinguish = 0;
-
-        (function poll(){
-          if(celebrated) return;
-          analyser.getByteFrequencyData(dataArray);
-          var sum = 0;
-          for(var i=0;i<dataArray.length;i++) sum += dataArray[i];
-          var avg = sum / dataArray.length;
-
-          if(avg > 34){ blowStreak++; } else { blowStreak = 0; }
-
-          var now = Date.now();
-          if(blowStreak > 4 && now - lastExtinguish > 260){
-            lastExtinguish = now;
-            extinguishOne();
-          }
-          rafId = requestAnimationFrame(poll);
-        })();
-      })
-      .catch(function(){
-        micFailed = true;
-        micHint.textContent = 'tap the cake to blow out the candles';
-      });
-  }
-
-})();
-</script>
-</body>
-</html>lse;
-  var celebrated = false;
-  var audioCtx, analyser, dataArray, rafId;
-
-  function litFlames(){
-    return flameEls.filter(function(f){ return !f.classList.contains('out'); });
-  }
-
-  function extinguishOne(){
-    var remaining = litFlames();
-    if(!remaining.length) return false;
-    remaining[0].classList.add('out');
-    if(!litFlames().length) celebrate();
-    return true;
-  }
-
-  function celebrate(){
-    if(celebrated) return;
-    celebrated = true;
-    micHint.style.opacity = '0';
-    stopMic();
-    var end = Date.now() + 1800;
-    (function frame(){
-      confetti({ particleCount: 6, angle: 60, spread: 65, origin: { x: 0, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
-      confetti({ particleCount: 6, angle: 120, spread: 65, origin: { x: 1, y: 0.4 }, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c'] });
-      if (Date.now() < end) requestAnimationFrame(frame);
-    })();
-    confetti({ particleCount: 140, spread: 120, origin: { y: 0.5 }, startVelocity: 45, colors: ['#ff6f91','#ffc75f','#f9f871','#f6416c','#a3d8f4'] });
-    setTimeout(function(){ banner.classList.add('show'); }, 250);
-  }
-
-  // tap fallback
-  flameEls.forEach(function(f){
-    f.addEventListener('click', function(e){
-      e.stopPropagation();
-      if(!f.classList.contains('out')){
-        f.classList.add('out');
-        if(!litFlames().length) celebrate();
-      }
-    });
-  });
-  cakeScreen.addEventListener('click', function(){
     if(!micReady) extinguishOne();
   });
 
